@@ -24,13 +24,14 @@ namespace BoothLibraryViewer
             return DbPath;
         }
 
-        public static (List<BoothItem> items, List<string> categories) LoadItems()
+        public static (List<BoothItem> items, List<string> categories, List<string> tags) LoadItems()
         {
             var items = new List<BoothItem>();
             var categorySet = new HashSet<string>();
+            var tagSet = new HashSet<string>();
 
             if (!DatabaseExists())
-                return (items, new List<string>());
+                return (items, new List<string>(), new List<string>());
 
             try
             {
@@ -97,7 +98,11 @@ namespace BoothLibraryViewer
 
                         // Set tags
                         if (tagLookup.TryGetValue(item.Id, out var tags))
+                        {
                             item.Tags = tags;
+                            foreach (var tag in tags)
+                                tagSet.Add(tag);
+                        }
 
                         // Find .unitypackage files
                         if (item.FolderExists)
@@ -119,7 +124,9 @@ namespace BoothLibraryViewer
 
             var categories = new List<string>(categorySet);
             categories.Sort();
-            return (items, categories);
+            var tagList = new List<string>(tagSet);
+            tagList.Sort();
+            return (items, categories, tagList);
         }
 
         public static string FormatCategory(string parentCategory, string subCategory)

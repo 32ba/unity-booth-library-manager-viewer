@@ -12,10 +12,13 @@ namespace BoothLibraryViewer
         private List<BoothItem> _allItems = new List<BoothItem>();
         private List<BoothItem> _filteredItems = new List<BoothItem>();
         private List<string> _categories = new List<string>();
+        private List<string> _tags = new List<string>();
 
         private string _searchText = "";
         private int _selectedCategoryIndex;
         private string[] _categoryOptions = { "All" };
+        private int _selectedTagIndex;
+        private string[] _tagOptions = { "All" };
         private Vector2 _scrollPosition;
         private bool _isLoaded;
 
@@ -51,19 +54,29 @@ namespace BoothLibraryViewer
                 _allItems.Clear();
                 _filteredItems.Clear();
                 _categories.Clear();
+                _tags.Clear();
                 _categoryOptions = new[] { "All" };
+                _tagOptions = new[] { "All" };
                 _selectedCategoryIndex = 0;
+                _selectedTagIndex = 0;
                 return;
             }
 
-            var (items, categories) = BoothDatabaseReader.LoadItems();
+            var (items, categories, tags) = BoothDatabaseReader.LoadItems();
             _allItems = items;
             _categories = categories;
+            _tags = tags;
 
-            var options = new List<string> { "All" };
-            options.AddRange(categories);
-            _categoryOptions = options.ToArray();
+            var catOptions = new List<string> { "All" };
+            catOptions.AddRange(categories);
+            _categoryOptions = catOptions.ToArray();
             _selectedCategoryIndex = 0;
+
+            var tagOpts = new List<string> { "All" };
+            tagOpts.AddRange(tags);
+            _tagOptions = tagOpts.ToArray();
+            _selectedTagIndex = 0;
+
             _searchText = "";
 
             ApplyFilters();
@@ -79,6 +92,15 @@ namespace BoothLibraryViewer
                 var selectedCategory = _categoryOptions[_selectedCategoryIndex];
                 _filteredItems = _filteredItems
                     .Where(item => BoothDatabaseReader.FormatCategory(item.ParentCategoryName, item.SubCategoryName) == selectedCategory)
+                    .ToList();
+            }
+
+            // Tag filter
+            if (_selectedTagIndex > 0 && _selectedTagIndex < _tagOptions.Length)
+            {
+                var selectedTag = _tagOptions[_selectedTagIndex];
+                _filteredItems = _filteredItems
+                    .Where(item => item.Tags.Contains(selectedTag))
                     .ToList();
             }
 
@@ -176,6 +198,15 @@ namespace BoothLibraryViewer
             EditorGUILayout.LabelField("Category:", GUILayout.Width(60));
             EditorGUI.BeginChangeCheck();
             _selectedCategoryIndex = EditorGUILayout.Popup(_selectedCategoryIndex, _categoryOptions, EditorStyles.toolbarPopup, GUILayout.Width(200));
+            if (EditorGUI.EndChangeCheck())
+                ApplyFilters();
+
+            GUILayout.Space(8);
+
+            // Tag filter
+            EditorGUILayout.LabelField("Tag:", GUILayout.Width(30));
+            EditorGUI.BeginChangeCheck();
+            _selectedTagIndex = EditorGUILayout.Popup(_selectedTagIndex, _tagOptions, EditorStyles.toolbarPopup, GUILayout.Width(200));
             if (EditorGUI.EndChangeCheck())
                 ApplyFilters();
 
