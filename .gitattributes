@@ -1,0 +1,4 @@
+# Unity
+*.meta -text merge=unityyamlmerge diff
+*.cs text diff=csharp
+*.dll binary

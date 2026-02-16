@@ -1,0 +1,16 @@
+{
+    "name": "net.32ba.booth-library-manager-viewer.editor",
+    "rootNamespace": "BoothLibraryViewer",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
