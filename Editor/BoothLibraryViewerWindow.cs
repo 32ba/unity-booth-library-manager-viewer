@@ -19,7 +19,6 @@ namespace BoothLibraryViewer
         private string[] _categoryOptions = { "All" };
         private HashSet<string> _selectedTags = new HashSet<string>();
         private Vector2 _scrollPosition;
-        private bool _isLoaded;
 
         private const float ThumbnailSize = 64f;
         private const float RowPadding = 4f;
@@ -35,8 +34,7 @@ namespace BoothLibraryViewer
 
         private void OnEnable()
         {
-            if (!_isLoaded)
-                Refresh();
+            Refresh();
         }
 
         private void OnDisable()
@@ -46,8 +44,6 @@ namespace BoothLibraryViewer
 
         private void Refresh()
         {
-            _isLoaded = true;
-
             if (!BoothDatabaseReader.DatabaseExists())
             {
                 _allItems.Clear();
