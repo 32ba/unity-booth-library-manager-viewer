@@ -86,11 +86,11 @@ namespace BoothLibraryViewer
                     .ToList();
             }
 
-            // Tag filter (AND: item must have all selected tags)
+            // Tag filter (OR: item must have at least one selected tag)
             if (_selectedTags.Count > 0)
             {
                 _filteredItems = _filteredItems
-                    .Where(item => _selectedTags.All(tag => item.Tags.Contains(tag)))
+                    .Where(item => item.Tags.Any(tag => _selectedTags.Contains(tag)))
                     .ToList();
             }
 
