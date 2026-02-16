@@ -13,10 +13,13 @@ namespace BoothLibraryViewer
         private List<BoothItem> _filteredItems = new List<BoothItem>();
         private List<string> _categories = new List<string>();
         private List<string> _tags = new List<string>();
+        private List<BoothList> _lists = new List<BoothList>();
 
         private string _searchText = "";
         private int _selectedCategoryIndex;
         private string[] _categoryOptions = { "All" };
+        private int _selectedListIndex;
+        private string[] _listOptions = { "All" };
         private HashSet<string> _selectedTags = new HashSet<string>();
         private Vector2 _scrollPosition;
 
@@ -50,21 +53,31 @@ namespace BoothLibraryViewer
                 _filteredItems.Clear();
                 _categories.Clear();
                 _tags.Clear();
+                _lists.Clear();
                 _categoryOptions = new[] { "All" };
                 _selectedCategoryIndex = 0;
+                _listOptions = new[] { "All" };
+                _selectedListIndex = 0;
                 _selectedTags.Clear();
                 return;
             }
 
-            var (items, categories, tags) = BoothDatabaseReader.LoadItems();
+            var (items, categories, tags, lists) = BoothDatabaseReader.LoadItems();
             _allItems = items;
             _categories = categories;
             _tags = tags;
+            _lists = lists;
 
             var catOptions = new List<string> { "All" };
             catOptions.AddRange(categories);
             _categoryOptions = catOptions.ToArray();
             _selectedCategoryIndex = 0;
+
+            var listOpts = new List<string> { "All" };
+            foreach (var l in _lists)
+                listOpts.Add(l.Title);
+            _listOptions = listOpts.ToArray();
+            _selectedListIndex = 0;
 
             _selectedTags.Clear();
 
@@ -76,6 +89,24 @@ namespace BoothLibraryViewer
         private void ApplyFilters()
         {
             _filteredItems = _allItems;
+
+            // List filter
+            if (_selectedListIndex > 0 && _selectedListIndex <= _lists.Count)
+            {
+                var selectedList = _lists[_selectedListIndex - 1];
+                if (selectedList.IsSmart)
+                {
+                    _filteredItems = _filteredItems
+                        .Where(item => BoothDatabaseReader.MatchesSmartList(item, selectedList.Criteria))
+                        .ToList();
+                }
+                else
+                {
+                    _filteredItems = _filteredItems
+                        .Where(item => selectedList.ItemIds.Contains(item.RegisteredItemId))
+                        .ToList();
+                }
+            }
 
             // Category filter
             if (_selectedCategoryIndex > 0 && _selectedCategoryIndex < _categoryOptions.Length)
@@ -204,6 +235,15 @@ namespace BoothLibraryViewer
                 });
                 PopupWindow.Show(GUILayoutUtility.GetLastRect(), popup);
             }
+
+            GUILayout.Space(8);
+
+            // List filter
+            EditorGUILayout.LabelField("List:", GUILayout.Width(30));
+            EditorGUI.BeginChangeCheck();
+            _selectedListIndex = EditorGUILayout.Popup(_selectedListIndex, _listOptions, EditorStyles.toolbarPopup, GUILayout.Width(160));
+            if (EditorGUI.EndChangeCheck())
+                ApplyFilters();
 
             GUILayout.FlexibleSpace();
 
