@@ -285,47 +285,105 @@ namespace BoothLibraryViewer
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndHorizontal();
 
-            // Expanded section: .unitypackage list
+            // Expanded section: folder tree
             if (item.IsExpanded)
             {
-                DrawUnityPackages(item);
+                DrawFolderTree(item);
             }
 
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawUnityPackages(BoothItem item)
+        private void DrawFolderTree(BoothItem item)
         {
-            if (item.UnityPackages.Count == 0)
+            if (!item.FolderExists)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField(".unitypackage が見つかりません", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("フォルダが見つかりません", EditorStyles.miniLabel);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            // Build tree lazily on first expand
+            if (item.FolderTree == null)
+                item.FolderTree = FolderTreeBuilder.Build(item.FolderPath);
+
+            if (item.FolderTree.Children.Count == 0)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.LabelField("フォルダは空です", EditorStyles.miniLabel);
                 EditorGUI.indentLevel--;
                 return;
             }
 
             EditorGUILayout.Space(2);
-            EditorGUI.indentLevel++;
 
             var headerStyle = new GUIStyle(EditorStyles.miniLabel) { fontStyle = FontStyle.Bold };
-            EditorGUILayout.LabelField($".unitypackage ({item.UnityPackages.Count}件)", headerStyle);
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(20);
+            EditorGUILayout.LabelField("\u2500\u2500\u2500 フォルダ構造 \u2500\u2500\u2500", headerStyle);
+            GUILayout.EndHorizontal();
 
-            foreach (var pkg in item.UnityPackages)
+            foreach (var child in item.FolderTree.Children)
+            {
+                DrawTreeNode(child, 1);
+            }
+        }
+
+        private void DrawTreeNode(FolderTreeNode node, int depth)
+        {
+            var indent = 20 + depth * 16;
+
+            if (node.IsDirectory)
             {
                 EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(20);
-                EditorGUILayout.LabelField(UnityPackageFinder.GetDisplayName(pkg), EditorStyles.miniLabel);
-                GUILayout.FlexibleSpace();
+                GUILayout.Space(indent);
 
-                if (GUILayout.Button("Import", EditorStyles.miniButton, GUILayout.Width(55)))
+                var arrow = node.IsExpanded ? "\u25BC" : "\u25B6";
+                var folderLabel = $"\ud83d\udcc1 {arrow} {node.Name}";
+                var folderStyle = new GUIStyle(EditorStyles.miniLabel)
                 {
-                    AssetDatabase.ImportPackage(pkg, true);
+                    fontStyle = FontStyle.Bold,
+                    richText = false,
+                };
+
+                if (GUILayout.Button(folderLabel, folderStyle))
+                {
+                    node.IsExpanded = !node.IsExpanded;
                 }
 
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+
+                if (node.IsExpanded)
+                {
+                    foreach (var child in node.Children)
+                    {
+                        DrawTreeNode(child, depth + 1);
+                    }
+                }
+            }
+            else
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Space(indent + 16);
+
+                var icon = node.IsUnityPackage ? "\ud83d\udce6" : "\ud83d\udcc4";
+                var fileLabel = $"{icon} {node.Name}";
+                var fileStyle = new GUIStyle(EditorStyles.miniLabel) { richText = false };
+
+                if (GUILayout.Button(fileLabel, fileStyle))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = node.FullPath,
+                        UseShellExecute = true,
+                    });
+                }
+
+                GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
             }
-
-            EditorGUI.indentLevel--;
         }
     }
 }
