@@ -349,6 +349,14 @@ namespace BoothLibraryViewer
                 var rect = EditorGUILayout.GetControlRect();
                 rect = EditorGUI.IndentedRect(rect);
 
+                // Hover highlight
+                var isHovered = rect.Contains(Event.current.mousePosition);
+                if (isHovered)
+                {
+                    EditorGUI.DrawRect(rect, new Color(1f, 1f, 1f, 0.08f));
+                    Repaint();
+                }
+
                 // Name area (left) and size area (right)
                 var sizeWidth = 70f;
                 var nameRect = new Rect(rect.x, rect.y, rect.width - sizeWidth - 8, rect.height);
