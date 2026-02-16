@@ -353,7 +353,7 @@ namespace BoothLibraryViewer
                 var isHovered = rect.Contains(Event.current.mousePosition);
                 if (isHovered)
                 {
-                    EditorGUI.DrawRect(rect, new Color(1f, 1f, 1f, 0.08f));
+                    EditorGUI.DrawRect(rect, new Color(0.172f, 0.365f, 0.529f, 0.5f));
                     Repaint();
                 }
 
