@@ -18,5 +18,6 @@ namespace BoothLibraryViewer
         public List<string> UnityPackages { get; set; } = new List<string>();
         public bool IsExpanded { get; set; }
         public FolderTreeNode FolderTree { get; set; }
+        public FolderTreeNode CurrentViewNode { get; set; }
     }
 }

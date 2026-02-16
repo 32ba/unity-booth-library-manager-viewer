@@ -14,7 +14,7 @@ namespace BoothLibraryViewer
                 Name = Path.GetFileName(rootPath),
                 FullPath = rootPath,
                 IsDirectory = true,
-                IsExpanded = true,
+                Parent = null,
             };
 
             if (!Directory.Exists(rootPath))
@@ -49,7 +49,7 @@ namespace BoothLibraryViewer
                         Name = Path.GetFileName(dir),
                         FullPath = dir,
                         IsDirectory = true,
-                        IsExpanded = false,
+                        Parent = node,
                     };
 
                     try
@@ -70,11 +70,23 @@ namespace BoothLibraryViewer
 
                 foreach (var file in files)
                 {
+                    long size = 0;
+                    try
+                    {
+                        size = new FileInfo(file).Length;
+                    }
+                    catch (Exception)
+                    {
+                        // Ignore
+                    }
+
                     children.Add(new FolderTreeNode
                     {
                         Name = Path.GetFileName(file),
                         FullPath = file,
                         IsDirectory = false,
+                        FileSize = size,
+                        Parent = node,
                     });
                 }
             }

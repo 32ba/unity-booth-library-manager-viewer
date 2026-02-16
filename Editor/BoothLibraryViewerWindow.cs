@@ -299,80 +299,135 @@ namespace BoothLibraryViewer
             if (!item.FolderExists)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("フォルダが見つかりません", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("\u30d5\u30a9\u30eb\u30c0\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093", EditorStyles.miniLabel);
                 EditorGUI.indentLevel--;
                 return;
             }
 
             // Build tree lazily on first expand
             if (item.FolderTree == null)
-                item.FolderTree = FolderTreeBuilder.Build(item.FolderPath);
-
-            if (item.FolderTree.Children.Count == 0)
             {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField("フォルダは空です", EditorStyles.miniLabel);
-                EditorGUI.indentLevel--;
-                return;
+                item.FolderTree = FolderTreeBuilder.Build(item.FolderPath);
+                item.CurrentViewNode = item.FolderTree;
             }
+
+            if (item.CurrentViewNode == null)
+                item.CurrentViewNode = item.FolderTree;
 
             EditorGUILayout.Space(2);
 
-            var headerStyle = new GUIStyle(EditorStyles.miniLabel) { fontStyle = FontStyle.Bold };
-            GUILayout.BeginHorizontal();
-            GUILayout.Space(20);
-            EditorGUILayout.LabelField("\u2500\u2500\u2500 フォルダ構造 \u2500\u2500\u2500", headerStyle);
-            GUILayout.EndHorizontal();
+            // Breadcrumb navigation
+            DrawBreadcrumb(item);
 
-            foreach (var child in item.FolderTree.Children)
+            EditorGUILayout.Space(2);
+
+            // Draw separator line
+            var rect = EditorGUILayout.GetControlRect(false, 1);
+            rect.x += 20;
+            rect.width -= 40;
+            EditorGUI.DrawRect(rect, new Color(0.3f, 0.3f, 0.3f));
+
+            EditorGUILayout.Space(2);
+
+            // Current directory contents
+            var currentNode = item.CurrentViewNode;
+
+            if (currentNode.Children.Count == 0)
             {
-                DrawTreeNode(child, 1);
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(24);
+                EditorGUILayout.LabelField("\u30d5\u30a9\u30eb\u30c0\u306f\u7a7a\u3067\u3059", EditorStyles.miniLabel);
+                GUILayout.EndHorizontal();
+                return;
+            }
+
+            foreach (var child in currentNode.Children)
+            {
+                DrawFileRow(child, item);
             }
         }
 
-        private void DrawTreeNode(FolderTreeNode node, int depth)
+        private void DrawBreadcrumb(BoothItem item)
         {
-            var indent = 20 + depth * 16;
+            // Build path from root to current node
+            var path = new List<FolderTreeNode>();
+            var node = item.CurrentViewNode;
+            while (node != null)
+            {
+                path.Add(node);
+                node = node.Parent;
+            }
+            path.Reverse();
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(20);
+
+            var breadcrumbStyle = new GUIStyle(EditorStyles.miniButton)
+            {
+                fontStyle = FontStyle.Normal,
+                padding = new RectOffset(4, 4, 1, 1),
+                margin = new RectOffset(0, 0, 0, 0),
+            };
+
+            var separatorStyle = new GUIStyle(EditorStyles.miniLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                padding = new RectOffset(0, 0, 0, 0),
+                margin = new RectOffset(0, 0, 0, 0),
+            };
+
+            for (int i = 0; i < path.Count; i++)
+            {
+                var segment = path[i];
+                var label = i == 0 ? "\u2302" : segment.Name;
+
+                // Truncate long names in breadcrumb
+                if (label.Length > 20)
+                    label = label.Substring(0, 17) + "...";
+
+                if (GUILayout.Button(label, breadcrumbStyle))
+                {
+                    item.CurrentViewNode = segment;
+                }
+
+                if (i < path.Count - 1)
+                {
+                    GUILayout.Label(">", separatorStyle, GUILayout.Width(12));
+                }
+            }
+
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void DrawFileRow(FolderTreeNode node, BoothItem item)
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(24);
 
             if (node.IsDirectory)
             {
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(indent);
-
-                var arrow = node.IsExpanded ? "\u25BC" : "\u25B6";
-                var folderLabel = $"\ud83d\udcc1 {arrow} {node.Name}";
-                var folderStyle = new GUIStyle(EditorStyles.miniLabel)
+                var folderStyle = new GUIStyle(EditorStyles.label)
                 {
-                    fontStyle = FontStyle.Bold,
                     richText = false,
+                    fontSize = 11,
                 };
 
-                if (GUILayout.Button(folderLabel, folderStyle))
+                if (GUILayout.Button("\ud83d\udcc1 " + node.Name, folderStyle))
                 {
-                    node.IsExpanded = !node.IsExpanded;
-                }
-
-                GUILayout.FlexibleSpace();
-                EditorGUILayout.EndHorizontal();
-
-                if (node.IsExpanded)
-                {
-                    foreach (var child in node.Children)
-                    {
-                        DrawTreeNode(child, depth + 1);
-                    }
+                    item.CurrentViewNode = node;
                 }
             }
             else
             {
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Space(indent + 16);
-
                 var icon = node.IsUnityPackage ? "\ud83d\udce6" : "\ud83d\udcc4";
-                var fileLabel = $"{icon} {node.Name}";
-                var fileStyle = new GUIStyle(EditorStyles.miniLabel) { richText = false };
+                var fileStyle = new GUIStyle(EditorStyles.label)
+                {
+                    richText = false,
+                    fontSize = 11,
+                };
 
-                if (GUILayout.Button(fileLabel, fileStyle))
+                if (GUILayout.Button(icon + " " + node.Name, fileStyle))
                 {
                     Process.Start(new ProcessStartInfo
                     {
@@ -380,10 +435,31 @@ namespace BoothLibraryViewer
                         UseShellExecute = true,
                     });
                 }
-
-                GUILayout.FlexibleSpace();
-                EditorGUILayout.EndHorizontal();
             }
+
+            GUILayout.FlexibleSpace();
+
+            // File size
+            if (!node.IsDirectory)
+            {
+                var sizeStyle = new GUIStyle(EditorStyles.miniLabel)
+                {
+                    alignment = TextAnchor.MiddleRight,
+                    normal = { textColor = new Color(0.6f, 0.6f, 0.6f) },
+                };
+                EditorGUILayout.LabelField(FormatFileSize(node.FileSize), sizeStyle, GUILayout.Width(70));
+            }
+
+            GUILayout.Space(8);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private static string FormatFileSize(long bytes)
+        {
+            if (bytes < 1024) return $"{bytes} B";
+            if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+            if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024):F2} MB";
+            return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
         }
     }
 }
