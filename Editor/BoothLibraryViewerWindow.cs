@@ -17,8 +17,7 @@ namespace BoothLibraryViewer
         private string _searchText = "";
         private int _selectedCategoryIndex;
         private string[] _categoryOptions = { "All" };
-        private int _selectedTagIndex;
-        private string[] _tagOptions = { "All" };
+        private HashSet<string> _selectedTags = new HashSet<string>();
         private Vector2 _scrollPosition;
         private bool _isLoaded;
 
@@ -56,9 +55,8 @@ namespace BoothLibraryViewer
                 _categories.Clear();
                 _tags.Clear();
                 _categoryOptions = new[] { "All" };
-                _tagOptions = new[] { "All" };
                 _selectedCategoryIndex = 0;
-                _selectedTagIndex = 0;
+                _selectedTags.Clear();
                 return;
             }
 
@@ -72,10 +70,7 @@ namespace BoothLibraryViewer
             _categoryOptions = catOptions.ToArray();
             _selectedCategoryIndex = 0;
 
-            var tagOpts = new List<string> { "All" };
-            tagOpts.AddRange(tags);
-            _tagOptions = tagOpts.ToArray();
-            _selectedTagIndex = 0;
+            _selectedTags.Clear();
 
             _searchText = "";
 
@@ -95,12 +90,11 @@ namespace BoothLibraryViewer
                     .ToList();
             }
 
-            // Tag filter
-            if (_selectedTagIndex > 0 && _selectedTagIndex < _tagOptions.Length)
+            // Tag filter (AND: item must have all selected tags)
+            if (_selectedTags.Count > 0)
             {
-                var selectedTag = _tagOptions[_selectedTagIndex];
                 _filteredItems = _filteredItems
-                    .Where(item => item.Tags.Contains(selectedTag))
+                    .Where(item => _selectedTags.All(tag => item.Tags.Contains(tag)))
                     .ToList();
             }
 
@@ -204,11 +198,16 @@ namespace BoothLibraryViewer
             GUILayout.Space(8);
 
             // Tag filter
-            EditorGUILayout.LabelField("Tag:", GUILayout.Width(30));
-            EditorGUI.BeginChangeCheck();
-            _selectedTagIndex = EditorGUILayout.Popup(_selectedTagIndex, _tagOptions, EditorStyles.toolbarPopup, GUILayout.Width(200));
-            if (EditorGUI.EndChangeCheck())
-                ApplyFilters();
+            var tagLabel = _selectedTags.Count > 0 ? $"Tags ({_selectedTags.Count})" : "Tags";
+            if (GUILayout.Button(tagLabel, EditorStyles.toolbarDropDown, GUILayout.Width(100)))
+            {
+                var popup = new TagFilterPopup(_tags, _selectedTags, () =>
+                {
+                    ApplyFilters();
+                    Repaint();
+                });
+                PopupWindow.Show(GUILayoutUtility.GetLastRect(), popup);
+            }
 
             GUILayout.FlexibleSpace();
 
