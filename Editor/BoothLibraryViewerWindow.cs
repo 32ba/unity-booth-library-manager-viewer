@@ -306,128 +306,57 @@ namespace BoothLibraryViewer
 
             // Build tree lazily on first expand
             if (item.FolderTree == null)
-            {
                 item.FolderTree = FolderTreeBuilder.Build(item.FolderPath);
-                item.CurrentViewNode = item.FolderTree;
-            }
 
-            if (item.CurrentViewNode == null)
-                item.CurrentViewNode = item.FolderTree;
-
-            EditorGUILayout.Space(2);
-
-            // Breadcrumb navigation
-            DrawBreadcrumb(item);
-
-            EditorGUILayout.Space(2);
-
-            // Draw separator line
-            var rect = EditorGUILayout.GetControlRect(false, 1);
-            rect.x += 20;
-            rect.width -= 40;
-            EditorGUI.DrawRect(rect, new Color(0.3f, 0.3f, 0.3f));
-
-            EditorGUILayout.Space(2);
-
-            // Current directory contents
-            var currentNode = item.CurrentViewNode;
-
-            if (currentNode.Children.Count == 0)
+            if (item.FolderTree.Children.Count == 0)
             {
-                GUILayout.BeginHorizontal();
-                GUILayout.Space(24);
+                EditorGUI.indentLevel++;
                 EditorGUILayout.LabelField("\u30d5\u30a9\u30eb\u30c0\u306f\u7a7a\u3067\u3059", EditorStyles.miniLabel);
-                GUILayout.EndHorizontal();
+                EditorGUI.indentLevel--;
                 return;
             }
 
-            foreach (var child in currentNode.Children)
+            EditorGUILayout.Space(4);
+
+            var savedIndent = EditorGUI.indentLevel;
+
+            foreach (var child in item.FolderTree.Children)
             {
-                DrawFileRow(child, item);
+                DrawTreeNode(child, 1);
             }
+
+            EditorGUI.indentLevel = savedIndent;
         }
 
-        private void DrawBreadcrumb(BoothItem item)
+        private void DrawTreeNode(FolderTreeNode node, int depth)
         {
-            // Build path from root to current node
-            var path = new List<FolderTreeNode>();
-            var node = item.CurrentViewNode;
-            while (node != null)
-            {
-                path.Add(node);
-                node = node.Parent;
-            }
-            path.Reverse();
-
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(20);
-
-            var breadcrumbStyle = new GUIStyle(EditorStyles.miniButton)
-            {
-                fontStyle = FontStyle.Normal,
-                padding = new RectOffset(4, 4, 1, 1),
-                margin = new RectOffset(0, 0, 0, 0),
-            };
-
-            var separatorStyle = new GUIStyle(EditorStyles.miniLabel)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                padding = new RectOffset(0, 0, 0, 0),
-                margin = new RectOffset(0, 0, 0, 0),
-            };
-
-            for (int i = 0; i < path.Count; i++)
-            {
-                var segment = path[i];
-                var label = i == 0 ? "\u2302" : segment.Name;
-
-                // Truncate long names in breadcrumb
-                if (label.Length > 20)
-                    label = label.Substring(0, 17) + "...";
-
-                if (GUILayout.Button(label, breadcrumbStyle))
-                {
-                    item.CurrentViewNode = segment;
-                }
-
-                if (i < path.Count - 1)
-                {
-                    GUILayout.Label(">", separatorStyle, GUILayout.Width(12));
-                }
-            }
-
-            GUILayout.FlexibleSpace();
-            EditorGUILayout.EndHorizontal();
-        }
-
-        private void DrawFileRow(FolderTreeNode node, BoothItem item)
-        {
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Space(24);
+            EditorGUI.indentLevel = depth;
 
             if (node.IsDirectory)
             {
-                var folderStyle = new GUIStyle(EditorStyles.label)
-                {
-                    richText = false,
-                    fontSize = 11,
-                };
+                node.IsExpanded = EditorGUILayout.Foldout(node.IsExpanded, node.Name, true);
 
-                if (GUILayout.Button("\ud83d\udcc1 " + node.Name, folderStyle))
+                if (node.IsExpanded)
                 {
-                    item.CurrentViewNode = node;
+                    foreach (var child in node.Children)
+                    {
+                        DrawTreeNode(child, depth + 1);
+                    }
                 }
             }
             else
             {
-                var icon = node.IsUnityPackage ? "\ud83d\udce6" : "\ud83d\udcc4";
-                var fileStyle = new GUIStyle(EditorStyles.label)
-                {
-                    richText = false,
-                    fontSize = 11,
-                };
+                var rect = EditorGUILayout.GetControlRect();
+                rect = EditorGUI.IndentedRect(rect);
 
-                if (GUILayout.Button(icon + " " + node.Name, fileStyle))
+                // Name area (left) and size area (right)
+                var sizeWidth = 70f;
+                var nameRect = new Rect(rect.x, rect.y, rect.width - sizeWidth - 8, rect.height);
+                var sizeRect = new Rect(rect.xMax - sizeWidth, rect.y, sizeWidth, rect.height);
+
+                // Clickable file name
+                EditorGUIUtility.AddCursorRect(nameRect, MouseCursor.Link);
+                if (GUI.Button(nameRect, node.Name, EditorStyles.label))
                 {
                     Process.Start(new ProcessStartInfo
                     {
@@ -435,23 +364,15 @@ namespace BoothLibraryViewer
                         UseShellExecute = true,
                     });
                 }
-            }
 
-            GUILayout.FlexibleSpace();
-
-            // File size
-            if (!node.IsDirectory)
-            {
+                // File size (right-aligned, dimmed)
                 var sizeStyle = new GUIStyle(EditorStyles.miniLabel)
                 {
                     alignment = TextAnchor.MiddleRight,
                     normal = { textColor = new Color(0.6f, 0.6f, 0.6f) },
                 };
-                EditorGUILayout.LabelField(FormatFileSize(node.FileSize), sizeStyle, GUILayout.Width(70));
+                GUI.Label(sizeRect, FormatFileSize(node.FileSize), sizeStyle);
             }
-
-            GUILayout.Space(8);
-            EditorGUILayout.EndHorizontal();
         }
 
         private static string FormatFileSize(long bytes)
