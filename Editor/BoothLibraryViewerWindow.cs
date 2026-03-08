@@ -22,9 +22,12 @@ namespace BoothLibraryViewer
         private string[] _listOptions = { "All" };
         private HashSet<string> _selectedTags = new HashSet<string>();
         private Vector2 _scrollPosition;
+        private string _pressedFilePath;
+        private Vector2 _pressedFileMousePosition;
 
         private const float ThumbnailSize = 64f;
         private const float RowPadding = 4f;
+        private const float DragStartThreshold = 6f;
 
         [MenuItem("Tools/BOOTH Library Viewer")]
         public static void ShowWindow()
@@ -428,16 +431,8 @@ namespace BoothLibraryViewer
                 var nameRect = new Rect(rect.x, rect.y, rect.width - sizeWidth - 8, rect.height);
                 var sizeRect = new Rect(rect.xMax - sizeWidth, rect.y, sizeWidth, rect.height);
 
-                // Clickable file name
-                EditorGUIUtility.AddCursorRect(nameRect, MouseCursor.Link);
-                if (GUI.Button(nameRect, node.Name, EditorStyles.label))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = node.FullPath,
-                        UseShellExecute = true,
-                    });
-                }
+                HandleFileInteraction(nameRect, node);
+                GUI.Label(nameRect, node.Name, EditorStyles.label);
 
                 // File size (right-aligned, dimmed)
                 var sizeStyle = new GUIStyle(EditorStyles.miniLabel)
@@ -447,6 +442,75 @@ namespace BoothLibraryViewer
                 };
                 GUI.Label(sizeRect, FormatFileSize(node.FileSize), sizeStyle);
             }
+        }
+
+        private void HandleFileInteraction(Rect rect, FolderTreeNode node)
+        {
+            EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
+
+            var currentEvent = Event.current;
+            switch (currentEvent.type)
+            {
+                case EventType.MouseDown:
+                    if (currentEvent.button != 0 || !rect.Contains(currentEvent.mousePosition))
+                        return;
+
+                    _pressedFilePath = node.FullPath;
+                    _pressedFileMousePosition = currentEvent.mousePosition;
+                    currentEvent.Use();
+                    return;
+
+                case EventType.MouseDrag:
+                    if (currentEvent.button != 0 || _pressedFilePath != node.FullPath)
+                        return;
+
+                    if ((currentEvent.mousePosition - _pressedFileMousePosition).sqrMagnitude < DragStartThreshold * DragStartThreshold)
+                        return;
+
+                    StartProjectDrag(node);
+                    ResetFileInteraction();
+                    currentEvent.Use();
+                    return;
+
+                case EventType.MouseUp:
+                    if (currentEvent.button != 0 || _pressedFilePath != node.FullPath)
+                        return;
+
+                    if (rect.Contains(currentEvent.mousePosition))
+                        OpenPath(node.FullPath);
+
+                    ResetFileInteraction();
+                    currentEvent.Use();
+                    return;
+
+                case EventType.MouseLeaveWindow:
+                    if (_pressedFilePath == node.FullPath)
+                        ResetFileInteraction();
+                    return;
+            }
+        }
+
+        private static void StartProjectDrag(FolderTreeNode node)
+        {
+            DragAndDrop.PrepareStartDrag();
+            DragAndDrop.objectReferences = new Object[0];
+            DragAndDrop.paths = new[] { node.FullPath };
+            DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+            DragAndDrop.StartDrag(node.Name);
+        }
+
+        private static void OpenPath(string path)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+
+        private void ResetFileInteraction()
+        {
+            _pressedFilePath = null;
         }
 
         private static string FormatFileSize(long bytes)
