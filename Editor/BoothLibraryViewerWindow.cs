@@ -9,6 +9,12 @@ namespace BoothLibraryViewer
 {
     public class BoothLibraryViewerWindow : EditorWindow
     {
+        private enum LibraryViewMode
+        {
+            Tile,
+            List,
+        }
+
         private List<BoothItem> _allItems = new List<BoothItem>();
         private List<BoothItem> _filteredItems = new List<BoothItem>();
         private List<string> _categories = new List<string>();
@@ -24,8 +30,14 @@ namespace BoothLibraryViewer
         private Vector2 _scrollPosition;
         private string _pressedFilePath;
         private Vector2 _pressedFileMousePosition;
+        private LibraryViewMode _viewMode = LibraryViewMode.Tile;
 
+        private const string ViewModePreferenceKey = "BoothLibraryViewer.ViewMode";
         private const float ThumbnailSize = 64f;
+        private const float TileWidth = 190f;
+        private const float TileHeight = 235f;
+        private const float TileThumbnailSize = 128f;
+        private const float TileSpacing = 8f;
         private const float RowPadding = 4f;
         private const float DragStartThreshold = 6f;
 
@@ -40,6 +52,7 @@ namespace BoothLibraryViewer
 
         private void OnEnable()
         {
+            _viewMode = (LibraryViewMode)EditorPrefs.GetInt(ViewModePreferenceKey, (int)LibraryViewMode.Tile);
             Refresh();
         }
 
@@ -149,7 +162,10 @@ namespace BoothLibraryViewer
             }
 
             DrawToolbar();
-            DrawItemList();
+            if (_viewMode == LibraryViewMode.Tile)
+                DrawItemTiles();
+            else
+                DrawItemList();
         }
 
         private void DrawDatabaseNotFound()
@@ -250,6 +266,16 @@ namespace BoothLibraryViewer
 
             GUILayout.FlexibleSpace();
 
+            EditorGUI.BeginChangeCheck();
+            _viewMode = (LibraryViewMode)GUILayout.Toolbar((int)_viewMode, new[] { "Tile", "List" }, EditorStyles.toolbarButton, GUILayout.Width(92));
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorPrefs.SetInt(ViewModePreferenceKey, (int)_viewMode);
+                _scrollPosition = Vector2.zero;
+            }
+
+            GUILayout.Space(8);
+
             EditorGUILayout.LabelField($"{_filteredItems.Count} items", GUILayout.Width(70));
 
             EditorGUILayout.EndHorizontal();
@@ -265,6 +291,118 @@ namespace BoothLibraryViewer
             }
 
             EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawItemTiles()
+        {
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+
+            var viewWidth = Mathf.Max(position.width - 20f, TileWidth);
+            var columnCount = Mathf.Max(1, Mathf.FloorToInt((viewWidth + TileSpacing) / (TileWidth + TileSpacing)));
+
+            for (var i = 0; i < _filteredItems.Count; i += columnCount)
+            {
+                var expandedItems = new List<BoothItem>();
+
+                EditorGUILayout.BeginHorizontal();
+                for (var column = 0; column < columnCount; column++)
+                {
+                    var itemIndex = i + column;
+                    if (itemIndex >= _filteredItems.Count)
+                    {
+                        GUILayout.Space(TileWidth + TileSpacing);
+                        continue;
+                    }
+
+                    var item = _filteredItems[itemIndex];
+                    DrawItemTile(item);
+                    if (item.IsExpanded)
+                        expandedItems.Add(item);
+
+                    if (column < columnCount - 1)
+                        GUILayout.Space(TileSpacing);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                foreach (var expandedItem in expandedItems)
+                {
+                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.LabelField(expandedItem.Name, EditorStyles.boldLabel);
+                    DrawFolderTree(expandedItem);
+                    EditorGUILayout.EndVertical();
+                }
+
+                GUILayout.Space(TileSpacing);
+            }
+
+            EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawItemTile(BoothItem item)
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox, GUILayout.Width(TileWidth), GUILayout.Height(TileHeight));
+
+            var thumbnail = ThumbnailCache.Get(item.ThumbnailUrl);
+            var thumbnailRowRect = GUILayoutUtility.GetRect(TileWidth - RowPadding * 2f, TileThumbnailSize, GUILayout.Width(TileWidth - RowPadding * 2f), GUILayout.Height(TileThumbnailSize));
+            var thumbnailRect = new Rect(
+                thumbnailRowRect.x + (thumbnailRowRect.width - TileThumbnailSize) * 0.5f,
+                thumbnailRowRect.y,
+                TileThumbnailSize,
+                TileThumbnailSize);
+
+            if (thumbnail != null)
+                GUI.DrawTexture(thumbnailRect, thumbnail, ScaleMode.ScaleToFit);
+
+            GUILayout.Space(4);
+
+            var nameStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.UpperLeft,
+                wordWrap = true,
+                richText = false,
+            };
+            var arrow = item.IsExpanded ? "\u25BC " : "\u25B6 ";
+            if (GUILayout.Button(arrow + item.Name, nameStyle, GUILayout.Height(38)))
+                item.IsExpanded = !item.IsExpanded;
+
+            var subStyle = new GUIStyle(EditorStyles.miniLabel)
+            {
+                wordWrap = false,
+                clipping = TextClipping.Clip,
+                richText = false,
+            };
+            EditorGUILayout.LabelField(item.ShopName, subStyle, GUILayout.Height(16));
+
+            var category = BoothDatabaseReader.FormatCategory(item.ParentCategoryName, item.SubCategoryName);
+            EditorGUILayout.LabelField(category, subStyle, GUILayout.Height(16));
+
+            if (!item.FolderExists && !string.IsNullOrEmpty(item.RegisteredItemId))
+            {
+                var warnStyle = new GUIStyle(EditorStyles.miniLabel)
+                {
+                    normal = { textColor = new Color(1f, 0.6f, 0.2f) },
+                };
+                EditorGUILayout.LabelField("(フォルダ未検出)", warnStyle, GUILayout.Height(16));
+            }
+            else
+            {
+                GUILayout.Space(16);
+            }
+
+            GUILayout.FlexibleSpace();
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("BOOTH", EditorStyles.miniButton))
+                Application.OpenURL($"https://booth.pm/ja/items/{item.Id}");
+
+            using (new EditorGUI.DisabledScope(!item.FolderExists))
+            {
+                if (GUILayout.Button("Folder", EditorStyles.miniButton))
+                    Process.Start("explorer.exe", "\"" + item.FolderPath.Replace('/', '\\') + "\"");
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.EndVertical();
         }
 
         private void DrawItemRow(BoothItem item)
