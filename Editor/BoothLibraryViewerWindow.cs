@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -13,6 +14,19 @@ namespace BoothLibraryViewer
         {
             Tile,
             List,
+        }
+
+        private enum SortMode
+        {
+            NameAscending,
+            NameDescending,
+            RegisteredNewest,
+            RegisteredOldest,
+            UpdatedNewest,
+            UpdatedOldest,
+            PublishedNewest,
+            PublishedOldest,
+            ShopAscending,
         }
 
         private List<BoothItem> _allItems = new List<BoothItem>();
@@ -31,8 +45,22 @@ namespace BoothLibraryViewer
         private string _pressedFilePath;
         private Vector2 _pressedFileMousePosition;
         private LibraryViewMode _viewMode = LibraryViewMode.Tile;
+        private SortMode _sortMode = SortMode.NameAscending;
 
         private const string ViewModePreferenceKey = "BoothLibraryViewer.ViewMode";
+        private const string SortModePreferenceKey = "BoothLibraryViewer.SortMode";
+        private static readonly string[] SortModeLabels =
+        {
+            "Name A-Z",
+            "Name Z-A",
+            "Registered Newest",
+            "Registered Oldest",
+            "Updated Newest",
+            "Updated Oldest",
+            "Published Newest",
+            "Published Oldest",
+            "Shop A-Z",
+        };
         private const float ThumbnailSize = 64f;
         private const float TileWidth = 190f;
         private const float TileHeight = 235f;
@@ -52,12 +80,15 @@ namespace BoothLibraryViewer
 
         private void OnEnable()
         {
-            _viewMode = (LibraryViewMode)EditorPrefs.GetInt(ViewModePreferenceKey, (int)LibraryViewMode.Tile);
+            ReleaseChecker.OnUpdateCheckCompleted += Repaint;
+            _viewMode = ReadEnumPreference(ViewModePreferenceKey, LibraryViewMode.Tile);
+            _sortMode = ReadEnumPreference(SortModePreferenceKey, SortMode.NameAscending);
             Refresh();
         }
 
         private void OnDisable()
         {
+            ReleaseChecker.OnUpdateCheckCompleted -= Repaint;
             ThumbnailCache.Clear();
         }
 
@@ -151,6 +182,105 @@ namespace BoothLibraryViewer
                         (item.ShopName != null && item.ShopName.ToLowerInvariant().Contains(search)))
                     .ToList();
             }
+
+            ApplySort();
+        }
+
+        private void ApplySort()
+        {
+            switch (_sortMode)
+            {
+                case SortMode.NameDescending:
+                    _filteredItems = _filteredItems
+                        .OrderByDescending(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ThenBy(item => item.Id)
+                        .ToList();
+                    break;
+
+                case SortMode.RegisteredNewest:
+                    _filteredItems = _filteredItems
+                        .OrderByDescending(item => DateOrMin(ParseDate(item.RegisteredCreatedAt)))
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.RegisteredOldest:
+                    _filteredItems = _filteredItems
+                        .OrderBy(item => DateOrMax(ParseDate(item.RegisteredCreatedAt)))
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.UpdatedNewest:
+                    _filteredItems = _filteredItems
+                        .OrderByDescending(item => DateOrMin(ParseDate(item.RegisteredUpdatedAt) ?? ParseDate(item.UpdatedAt)))
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.UpdatedOldest:
+                    _filteredItems = _filteredItems
+                        .OrderBy(item => DateOrMax(ParseDate(item.RegisteredUpdatedAt) ?? ParseDate(item.UpdatedAt)))
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.PublishedNewest:
+                    _filteredItems = _filteredItems
+                        .OrderByDescending(item => DateOrMin(ParseDate(item.PublishedAt)))
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.PublishedOldest:
+                    _filteredItems = _filteredItems
+                        .OrderBy(item => DateOrMax(ParseDate(item.PublishedAt)))
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.ShopAscending:
+                    _filteredItems = _filteredItems
+                        .OrderBy(item => item.ShopName, StringComparer.CurrentCultureIgnoreCase)
+                        .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    break;
+
+                case SortMode.NameAscending:
+                default:
+                    _filteredItems = _filteredItems
+                        .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ThenBy(item => item.Id)
+                        .ToList();
+                    break;
+            }
+        }
+
+        private static DateTimeOffset? ParseDate(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return null;
+
+            if (DateTimeOffset.TryParse(value, out var date))
+                return date;
+
+            return null;
+        }
+
+        private static DateTimeOffset DateOrMin(DateTimeOffset? value)
+        {
+            return value ?? DateTimeOffset.MinValue;
+        }
+
+        private static DateTimeOffset DateOrMax(DateTimeOffset? value)
+        {
+            return value ?? DateTimeOffset.MaxValue;
+        }
+
+        private static T ReadEnumPreference<T>(string key, T defaultValue) where T : struct
+        {
+            var value = EditorPrefs.GetInt(key, Convert.ToInt32(defaultValue));
+            return System.Enum.IsDefined(typeof(T), value) ? (T)(object)value : defaultValue;
         }
 
         private void OnGUI()
@@ -162,10 +292,27 @@ namespace BoothLibraryViewer
             }
 
             DrawToolbar();
+            DrawUpdateNotification();
             if (_viewMode == LibraryViewMode.Tile)
                 DrawItemTiles();
             else
                 DrawItemList();
+        }
+
+        private static void DrawUpdateNotification()
+        {
+            if (!ReleaseChecker.HasNewVersion || string.IsNullOrEmpty(ReleaseChecker.LatestVersion))
+                return;
+
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("新しいバージョンがあります", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    $"{VersionUtility.FormatVersion(ReleaseChecker.GetCurrentVersion())} -> {VersionUtility.FormatVersion(ReleaseChecker.LatestVersion)}");
+
+                if (GUILayout.Button("リリースページを開く"))
+                    ReleaseChecker.OpenReleasePage();
+            }
         }
 
         private void DrawDatabaseNotFound()
@@ -263,6 +410,22 @@ namespace BoothLibraryViewer
             _selectedListIndex = EditorGUILayout.Popup(_selectedListIndex, _listOptions, EditorStyles.toolbarPopup, GUILayout.Width(160));
             if (EditorGUI.EndChangeCheck())
                 ApplyFilters();
+
+            GUILayout.FlexibleSpace();
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+            EditorGUILayout.LabelField("Sort:", GUILayout.Width(32));
+            EditorGUI.BeginChangeCheck();
+            _sortMode = (SortMode)EditorGUILayout.Popup((int)_sortMode, SortModeLabels, EditorStyles.toolbarPopup, GUILayout.Width(150));
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorPrefs.SetInt(SortModePreferenceKey, (int)_sortMode);
+                ApplyFilters();
+                _scrollPosition = Vector2.zero;
+            }
 
             GUILayout.FlexibleSpace();
 

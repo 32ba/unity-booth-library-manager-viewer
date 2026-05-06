@@ -28,6 +28,10 @@ namespace BoothLibraryViewer
         public string ThumbnailUrl { get; set; }
         public string SubCategoryName { get; set; }
         public string ParentCategoryName { get; set; }
+        public string RegisteredCreatedAt { get; set; }
+        public string RegisteredUpdatedAt { get; set; }
+        public string PublishedAt { get; set; }
+        public string UpdatedAt { get; set; }
         public string RegisteredItemId { get; set; }
         public string FolderPath { get; set; }
         public bool FolderExists { get; set; }

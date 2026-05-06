@@ -44,11 +44,15 @@ namespace BoothLibraryViewer
                     var query = @"
                         SELECT
                             ri.id AS registered_item_id,
+                            ri.created_at AS registered_created_at,
+                            ri.updated_at AS registered_updated_at,
                             bi.id AS booth_item_id,
                             bi.name AS item_name,
                             bi.shop_subdomain,
                             s.name AS shop_name,
                             bi.thumbnail_url,
+                            bi.published_at,
+                            bi.updated_at,
                             sc.id AS sub_category_id,
                             sc.name AS sub_category_name,
                             sc.parent_category_id AS parent_category_id,
@@ -91,6 +95,10 @@ namespace BoothLibraryViewer
                             SubCategoryName = row.sub_category_name ?? "",
                             ParentCategoryId = row.parent_category_id,
                             ParentCategoryName = row.parent_category_name ?? "",
+                            RegisteredCreatedAt = row.registered_created_at,
+                            RegisteredUpdatedAt = row.registered_updated_at,
+                            PublishedAt = row.published_at,
+                            UpdatedAt = row.updated_at,
                             RegisteredItemId = row.registered_item_id,
                         };
 
@@ -241,11 +249,15 @@ namespace BoothLibraryViewer
         private class ItemRow
         {
             public string registered_item_id { get; set; }
+            public string registered_created_at { get; set; }
+            public string registered_updated_at { get; set; }
             public int booth_item_id { get; set; }
             public string item_name { get; set; }
             public string shop_subdomain { get; set; }
             public string shop_name { get; set; }
             public string thumbnail_url { get; set; }
+            public string published_at { get; set; }
+            public string updated_at { get; set; }
             public int? sub_category_id { get; set; }
             public string sub_category_name { get; set; }
             public int? parent_category_id { get; set; }
