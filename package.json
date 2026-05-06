@@ -1,6 +1,6 @@
 {
   "name": "net.32ba.booth-library-manager-viewer",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "displayName": "BOOTH Library Viewer",
   "description": "View and import assets managed by BOOTH Library Manager directly from Unity Editor.",
   "unity": "2022.3",
