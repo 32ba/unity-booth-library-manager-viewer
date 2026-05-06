@@ -794,7 +794,7 @@ namespace BoothLibraryViewer
         private static void StartProjectDrag(FolderTreeNode node)
         {
             DragAndDrop.PrepareStartDrag();
-            DragAndDrop.objectReferences = new Object[0];
+            DragAndDrop.objectReferences = new UnityEngine.Object[0];
             DragAndDrop.paths = new[] { node.FullPath };
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
             DragAndDrop.StartDrag(node.Name);
