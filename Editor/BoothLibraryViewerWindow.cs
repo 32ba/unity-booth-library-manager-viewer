@@ -37,9 +37,9 @@ namespace BoothLibraryViewer
 
         private string _searchText = "";
         private int _selectedCategoryIndex;
-        private string[] _categoryOptions = { "All" };
+        private string[] _categoryOptions = { "すべて" };
         private int _selectedListIndex;
-        private string[] _listOptions = { "All" };
+        private string[] _listOptions = { "すべて" };
         private HashSet<string> _selectedTags = new HashSet<string>();
         private Vector2 _scrollPosition;
         private string _pressedFilePath;
@@ -51,15 +51,15 @@ namespace BoothLibraryViewer
         private const string SortModePreferenceKey = "BoothLibraryViewer.SortMode";
         private static readonly string[] SortModeLabels =
         {
-            "Name A-Z",
-            "Name Z-A",
-            "Registered Newest",
-            "Registered Oldest",
-            "Updated Newest",
-            "Updated Oldest",
-            "Published Newest",
-            "Published Oldest",
-            "Shop A-Z",
+            "名前 A-Z",
+            "名前 Z-A",
+            "登録が新しい順",
+            "登録が古い順",
+            "更新が新しい順",
+            "更新が古い順",
+            "公開が新しい順",
+            "公開が古い順",
+            "ショップ A-Z",
         };
         private const float ThumbnailSize = 64f;
         private const float TileWidth = 190f;
@@ -101,13 +101,18 @@ namespace BoothLibraryViewer
                 _categories.Clear();
                 _tags.Clear();
                 _lists.Clear();
-                _categoryOptions = new[] { "All" };
+                _categoryOptions = new[] { "すべて" };
                 _selectedCategoryIndex = 0;
-                _listOptions = new[] { "All" };
+                _listOptions = new[] { "すべて" };
                 _selectedListIndex = 0;
                 _selectedTags.Clear();
                 return;
             }
+
+            var selectedCategory = GetSelectedCategory();
+            var selectedList = GetSelectedList();
+            var selectedTags = new HashSet<string>(_selectedTags);
+            var expandedItemId = _allItems.FirstOrDefault(item => item.IsExpanded)?.Id;
 
             var (items, categories, tags, lists) = BoothDatabaseReader.LoadItems();
             _allItems = items;
@@ -115,22 +120,50 @@ namespace BoothLibraryViewer
             _tags = tags;
             _lists = lists;
 
-            var catOptions = new List<string> { "All" };
+            var catOptions = new List<string> { "すべて" };
             catOptions.AddRange(categories);
             _categoryOptions = catOptions.ToArray();
-            _selectedCategoryIndex = 0;
+            _selectedCategoryIndex = string.IsNullOrEmpty(selectedCategory)
+                ? 0
+                : Mathf.Max(0, Array.IndexOf(_categoryOptions, selectedCategory));
 
-            var listOpts = new List<string> { "All" };
+            var listOpts = new List<string> { "すべて" };
             foreach (var l in _lists)
                 listOpts.Add(l.Title);
             _listOptions = listOpts.ToArray();
             _selectedListIndex = 0;
+            if (selectedList != null)
+            {
+                var listIndex = _lists.FindIndex(list =>
+                    list.Id == selectedList.Id && list.IsSmart == selectedList.IsSmart);
+                if (listIndex >= 0)
+                    _selectedListIndex = listIndex + 1;
+            }
 
-            _selectedTags.Clear();
+            _selectedTags = new HashSet<string>(selectedTags.Where(tag => _tags.Contains(tag)));
 
-            _searchText = "";
+            if (expandedItemId.HasValue)
+            {
+                var expandedItem = _allItems.FirstOrDefault(item => item.Id == expandedItemId.Value);
+                if (expandedItem != null)
+                    expandedItem.IsExpanded = true;
+            }
 
             ApplyFilters();
+        }
+
+        private string GetSelectedCategory()
+        {
+            return _selectedCategoryIndex > 0 && _selectedCategoryIndex < _categoryOptions.Length
+                ? _categoryOptions[_selectedCategoryIndex]
+                : null;
+        }
+
+        private BoothList GetSelectedList()
+        {
+            return _selectedListIndex > 0 && _selectedListIndex <= _lists.Count
+                ? _lists[_selectedListIndex - 1]
+                : null;
         }
 
         private void ApplyFilters()
@@ -364,7 +397,7 @@ namespace BoothLibraryViewer
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-            if (GUILayout.Button("Refresh", EditorStyles.toolbarButton, GUILayout.Width(60)))
+            if (GUILayout.Button("更新", EditorStyles.toolbarButton, GUILayout.Width(48)))
             {
                 ThumbnailCache.Clear();
                 Refresh();
@@ -372,26 +405,32 @@ namespace BoothLibraryViewer
 
             GUILayout.Space(8);
 
-            // Search field
-            EditorGUILayout.LabelField("Search:", GUILayout.Width(50));
+            EditorGUILayout.LabelField("検索", GUILayout.Width(30));
             EditorGUI.BeginChangeCheck();
             _searchText = EditorGUILayout.TextField(_searchText, EditorStyles.toolbarSearchField, GUILayout.MinWidth(100));
             if (EditorGUI.EndChangeCheck())
                 ApplyFilters();
 
-            GUILayout.Space(8);
+            EditorGUILayout.LabelField($"{_filteredItems.Count}件", GUILayout.Width(52));
 
-            // Category filter
-            EditorGUILayout.LabelField("Category:", GUILayout.Width(60));
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+
+            EditorGUILayout.LabelField("カテゴリ", GUILayout.Width(48));
             EditorGUI.BeginChangeCheck();
-            _selectedCategoryIndex = EditorGUILayout.Popup(_selectedCategoryIndex, _categoryOptions, EditorStyles.toolbarPopup, GUILayout.Width(200));
+            _selectedCategoryIndex = EditorGUILayout.Popup(
+                _selectedCategoryIndex,
+                _categoryOptions,
+                EditorStyles.toolbarPopup,
+                GUILayout.MinWidth(100),
+                GUILayout.MaxWidth(220));
             if (EditorGUI.EndChangeCheck())
                 ApplyFilters();
 
             GUILayout.Space(8);
 
-            // Tag filter
-            var tagLabel = _selectedTags.Count > 0 ? $"Tags ({_selectedTags.Count})" : "Tags";
+            var tagLabel = _selectedTags.Count > 0 ? $"タグ ({_selectedTags.Count})" : "タグ";
             if (GUILayout.Button(tagLabel, EditorStyles.toolbarDropDown, GUILayout.Width(100)))
             {
                 var popup = new TagFilterPopup(_tags, _selectedTags, () =>
@@ -404,10 +443,14 @@ namespace BoothLibraryViewer
 
             GUILayout.Space(8);
 
-            // List filter
-            EditorGUILayout.LabelField("List:", GUILayout.Width(30));
+            EditorGUILayout.LabelField("リスト", GUILayout.Width(34));
             EditorGUI.BeginChangeCheck();
-            _selectedListIndex = EditorGUILayout.Popup(_selectedListIndex, _listOptions, EditorStyles.toolbarPopup, GUILayout.Width(160));
+            _selectedListIndex = EditorGUILayout.Popup(
+                _selectedListIndex,
+                _listOptions,
+                EditorStyles.toolbarPopup,
+                GUILayout.MinWidth(80),
+                GUILayout.MaxWidth(180));
             if (EditorGUI.EndChangeCheck())
                 ApplyFilters();
 
@@ -417,35 +460,131 @@ namespace BoothLibraryViewer
 
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
-            EditorGUILayout.LabelField("Sort:", GUILayout.Width(32));
+            EditorGUILayout.LabelField("並び順", GUILayout.Width(42));
             EditorGUI.BeginChangeCheck();
-            _sortMode = (SortMode)EditorGUILayout.Popup((int)_sortMode, SortModeLabels, EditorStyles.toolbarPopup, GUILayout.Width(150));
+            _sortMode = (SortMode)EditorGUILayout.Popup(
+                (int)_sortMode,
+                SortModeLabels,
+                EditorStyles.toolbarPopup,
+                GUILayout.Width(150));
             if (EditorGUI.EndChangeCheck())
             {
                 EditorPrefs.SetInt(SortModePreferenceKey, (int)_sortMode);
                 ApplyFilters();
-                _scrollPosition = Vector2.zero;
             }
 
             GUILayout.FlexibleSpace();
 
             EditorGUI.BeginChangeCheck();
-            _viewMode = (LibraryViewMode)GUILayout.Toolbar((int)_viewMode, new[] { "Tile", "List" }, EditorStyles.toolbarButton, GUILayout.Width(92));
+            _viewMode = (LibraryViewMode)GUILayout.Toolbar(
+                (int)_viewMode,
+                new[] { "タイル", "リスト" },
+                EditorStyles.toolbarButton,
+                GUILayout.Width(104));
             if (EditorGUI.EndChangeCheck())
-            {
                 EditorPrefs.SetInt(ViewModePreferenceKey, (int)_viewMode);
-                _scrollPosition = Vector2.zero;
+
+            EditorGUILayout.EndHorizontal();
+
+            DrawActiveFilters();
+        }
+
+        private void DrawActiveFilters()
+        {
+            if (!HasActiveFilters())
+                return;
+
+            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
+            EditorGUILayout.LabelField("絞り込み中", EditorStyles.miniBoldLabel, GUILayout.Width(64));
+
+            if (position.width < 720f)
+            {
+                var summary = new List<string>();
+                if (_selectedCategoryIndex > 0)
+                    summary.Add($"カテゴリ: {GetSelectedCategory()}");
+                if (_selectedListIndex > 0)
+                    summary.Add($"リスト: {GetSelectedList()?.Title}");
+                if (_selectedTags.Count > 0)
+                    summary.Add($"タグ: {_selectedTags.Count}件");
+                if (!string.IsNullOrEmpty(_searchText))
+                    summary.Add("検索語あり");
+
+                EditorGUILayout.LabelField(string.Join(" / ", summary), EditorStyles.miniLabel);
+                if (GUILayout.Button("すべて解除", EditorStyles.miniButton, GUILayout.Width(72)))
+                    ClearFilters();
+                EditorGUILayout.EndHorizontal();
+                return;
             }
 
-            GUILayout.Space(8);
+            if (_selectedCategoryIndex > 0 &&
+                GUILayout.Button(
+                    $"カテゴリ: {GetSelectedCategory()}  ×",
+                    EditorStyles.miniButton,
+                    GUILayout.MaxWidth(180)))
+            {
+                _selectedCategoryIndex = 0;
+                ApplyFilters();
+            }
 
-            EditorGUILayout.LabelField($"{_filteredItems.Count} items", GUILayout.Width(70));
+            var selectedList = GetSelectedList();
+            if (selectedList != null &&
+                GUILayout.Button(
+                    $"リスト: {selectedList.Title}  ×",
+                    EditorStyles.miniButton,
+                    GUILayout.MaxWidth(160)))
+            {
+                _selectedListIndex = 0;
+                ApplyFilters();
+            }
+
+            foreach (var tag in _selectedTags.Take(3).ToList())
+            {
+                if (GUILayout.Button(
+                    $"{tag}  ×",
+                    EditorStyles.miniButton,
+                    GUILayout.MaxWidth(110)))
+                {
+                    _selectedTags.Remove(tag);
+                    ApplyFilters();
+                }
+            }
+
+            if (_selectedTags.Count > 3)
+                EditorGUILayout.LabelField($"+{_selectedTags.Count - 3}", EditorStyles.miniLabel, GUILayout.Width(28));
+
+            GUILayout.FlexibleSpace();
+
+            if (GUILayout.Button("すべて解除", EditorStyles.miniButton, GUILayout.Width(72)))
+                ClearFilters();
 
             EditorGUILayout.EndHorizontal();
         }
 
+        private bool HasActiveFilters()
+        {
+            return !string.IsNullOrEmpty(_searchText) ||
+                   _selectedCategoryIndex > 0 ||
+                   _selectedListIndex > 0 ||
+                   _selectedTags.Count > 0;
+        }
+
+        private void ClearFilters()
+        {
+            _searchText = "";
+            _selectedCategoryIndex = 0;
+            _selectedListIndex = 0;
+            _selectedTags.Clear();
+            ApplyFilters();
+        }
+
         private void DrawItemList()
         {
+            if (_filteredItems.Count == 0)
+            {
+                DrawEmptyState();
+                return;
+            }
+
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
 
             foreach (var item in _filteredItems)
@@ -458,6 +597,12 @@ namespace BoothLibraryViewer
 
         private void DrawItemTiles()
         {
+            if (_filteredItems.Count == 0)
+            {
+                DrawEmptyState();
+                return;
+            }
+
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
 
             var viewWidth = Mathf.Max(position.width - 20f, TileWidth);
@@ -491,7 +636,7 @@ namespace BoothLibraryViewer
                 {
                     EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                     EditorGUILayout.LabelField(expandedItem.Name, EditorStyles.boldLabel);
-                    DrawFolderTree(expandedItem);
+                    DrawItemDetails(expandedItem);
                     EditorGUILayout.EndVertical();
                 }
 
@@ -499,6 +644,36 @@ namespace BoothLibraryViewer
             }
 
             EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawEmptyState()
+        {
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.BeginVertical(GUILayout.Width(320));
+
+            var title = _allItems.Count == 0
+                ? "登録されているアイテムがありません"
+                : "条件に一致するアイテムがありません";
+            var style = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true,
+            };
+            EditorGUILayout.LabelField(title, style);
+
+            if (HasActiveFilters())
+            {
+                EditorGUILayout.Space(8);
+                if (GUILayout.Button("絞り込みをすべて解除"))
+                    ClearFilters();
+            }
+
+            EditorGUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+            GUILayout.FlexibleSpace();
         }
 
         private void DrawItemTile(BoothItem item)
@@ -526,7 +701,7 @@ namespace BoothLibraryViewer
             };
             var arrow = item.IsExpanded ? "\u25BC " : "\u25B6 ";
             if (GUILayout.Button(arrow + item.Name, nameStyle, GUILayout.Height(38)))
-                item.IsExpanded = !item.IsExpanded;
+                ToggleItemExpansion(item);
 
             var subStyle = new GUIStyle(EditorStyles.miniLabel)
             {
@@ -560,7 +735,7 @@ namespace BoothLibraryViewer
 
             using (new EditorGUI.DisabledScope(!item.FolderExists))
             {
-                if (GUILayout.Button("Folder", EditorStyles.miniButton))
+                if (GUILayout.Button("フォルダ", EditorStyles.miniButton))
                     Process.Start("explorer.exe", "\"" + item.FolderPath.Replace('/', '\\') + "\"");
             }
             EditorGUILayout.EndHorizontal();
@@ -597,9 +772,7 @@ namespace BoothLibraryViewer
                 richText = false,
             };
             if (GUILayout.Button(arrow + item.Name, nameStyle))
-            {
-                item.IsExpanded = !item.IsExpanded;
-            }
+                ToggleItemExpansion(item);
 
             GUILayout.FlexibleSpace();
 
@@ -610,7 +783,7 @@ namespace BoothLibraryViewer
 
             if (item.FolderExists)
             {
-                if (GUILayout.Button("Folder", EditorStyles.miniButton, GUILayout.Width(50)))
+                if (GUILayout.Button("フォルダ", EditorStyles.miniButton, GUILayout.Width(60)))
                 {
                     Process.Start("explorer.exe", "\"" + item.FolderPath.Replace('/', '\\') + "\"");
                 }
@@ -658,10 +831,70 @@ namespace BoothLibraryViewer
             // Expanded section: folder tree
             if (item.IsExpanded)
             {
-                DrawFolderTree(item);
+                DrawItemDetails(item);
             }
 
             EditorGUILayout.EndVertical();
+        }
+
+        private void ToggleItemExpansion(BoothItem item)
+        {
+            var willExpand = !item.IsExpanded;
+            foreach (var otherItem in _allItems)
+                otherItem.IsExpanded = false;
+
+            item.IsExpanded = willExpand;
+            if (willExpand)
+                EnsureUnityPackages(item);
+        }
+
+        private static void EnsureUnityPackages(BoothItem item)
+        {
+            if (item.UnityPackagesLoaded)
+                return;
+
+            item.UnityPackagesLoaded = true;
+            item.UnityPackages = item.FolderExists
+                ? UnityPackageFinder.Find(item.FolderPath)
+                : new List<string>();
+        }
+
+        private void DrawItemDetails(BoothItem item)
+        {
+            EnsureUnityPackages(item);
+            DrawUnityPackages(item);
+            DrawFolderTree(item);
+        }
+
+        private static void DrawUnityPackages(BoothItem item)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Unityパッケージ", EditorStyles.boldLabel);
+
+            if (!item.FolderExists)
+            {
+                EditorGUILayout.LabelField("商品フォルダが見つからないため、インポートできません。", EditorStyles.miniLabel);
+                return;
+            }
+
+            if (item.UnityPackages.Count == 0)
+            {
+                EditorGUILayout.LabelField(
+                    ".unitypackage は見つかりませんでした。下のファイル一覧から個別に開くかドラッグできます。",
+                    EditorStyles.wordWrappedMiniLabel);
+                return;
+            }
+
+            foreach (var packagePath in item.UnityPackages)
+            {
+                EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
+                EditorGUILayout.LabelField(
+                    UnityPackageFinder.GetDisplayName(packagePath),
+                    EditorStyles.label);
+                if (GUILayout.Button("インポート…", GUILayout.Width(88)))
+                    AssetDatabase.ImportPackage(packagePath, true);
+                EditorGUILayout.EndHorizontal();
+            }
         }
 
         private void DrawFolderTree(BoothItem item)
@@ -687,6 +920,10 @@ namespace BoothLibraryViewer
             }
 
             EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("ファイル", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "クリックで開く・Projectウィンドウへドラッグして取り込む",
+                EditorStyles.wordWrappedMiniLabel);
 
             var savedIndent = EditorGUI.indentLevel;
 
@@ -704,7 +941,10 @@ namespace BoothLibraryViewer
 
             if (node.IsDirectory)
             {
+                EditorGUI.BeginChangeCheck();
                 node.IsExpanded = EditorGUILayout.Foldout(node.IsExpanded, node.Name, true);
+                if (EditorGUI.EndChangeCheck() && node.IsExpanded)
+                    FolderTreeBuilder.EnsureChildren(node);
 
                 if (node.IsExpanded)
                 {

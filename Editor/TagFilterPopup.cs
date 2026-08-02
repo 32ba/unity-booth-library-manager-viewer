@@ -61,9 +61,8 @@ namespace BoothLibraryViewer
 
             EditorGUILayout.EndScrollView();
 
-            // Clear button
             EditorGUILayout.Space(2);
-            if (GUILayout.Button("Clear"))
+            if (GUILayout.Button("選択をすべて解除"))
             {
                 if (_selectedTags.Count > 0)
                 {

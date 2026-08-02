@@ -117,10 +117,6 @@ namespace BoothLibraryViewer
                                 tagSet.Add(tag);
                         }
 
-                        // Find .unitypackage files
-                        if (item.FolderExists)
-                            item.UnityPackages = UnityPackageFinder.Find(item.FolderPath);
-
                         // Collect category for filter
                         var categoryDisplay = FormatCategory(item.ParentCategoryName, item.SubCategoryName);
                         if (!string.IsNullOrEmpty(categoryDisplay))

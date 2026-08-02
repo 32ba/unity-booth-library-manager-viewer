@@ -12,6 +12,7 @@ namespace BoothLibraryViewer
         public long FileSize;
         public FolderTreeNode Parent;
         public List<FolderTreeNode> Children = new List<FolderTreeNode>();
+        public bool ChildrenLoaded;
 
         public bool IsUnityPackage =>
             !IsDirectory && Name.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase);

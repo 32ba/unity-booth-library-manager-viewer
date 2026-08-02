@@ -20,20 +20,17 @@ namespace BoothLibraryViewer
             if (!Directory.Exists(rootPath))
                 return root;
 
-            try
-            {
-                PopulateChildren(root);
-            }
-            catch (Exception)
-            {
-                // Ignore permission errors or other IO exceptions
-            }
+            EnsureChildren(root);
 
             return root;
         }
 
-        private static void PopulateChildren(FolderTreeNode node)
+        public static void EnsureChildren(FolderTreeNode node)
         {
+            if (node == null || !node.IsDirectory || node.ChildrenLoaded)
+                return;
+
+            node.ChildrenLoaded = true;
             var children = new List<FolderTreeNode>();
 
             try
@@ -51,15 +48,6 @@ namespace BoothLibraryViewer
                         IsDirectory = true,
                         Parent = node,
                     };
-
-                    try
-                    {
-                        PopulateChildren(child);
-                    }
-                    catch (Exception)
-                    {
-                        // Skip inaccessible directories
-                    }
 
                     children.Add(child);
                 }

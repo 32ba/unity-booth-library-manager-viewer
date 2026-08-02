@@ -39,6 +39,7 @@ namespace BoothLibraryViewer
         public int? ParentCategoryId { get; set; }
         public List<string> Tags { get; set; } = new List<string>();
         public List<string> UnityPackages { get; set; } = new List<string>();
+        public bool UnityPackagesLoaded { get; set; }
         public bool IsExpanded { get; set; }
         public FolderTreeNode FolderTree { get; set; }
     }
