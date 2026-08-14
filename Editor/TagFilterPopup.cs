@@ -43,12 +43,21 @@ namespace BoothLibraryViewer
                 ? _allTags
                 : _allTags.Where(t => t.IndexOf(_searchText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
 
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+            _scrollPosition = EditorGUILayout.BeginScrollView(
+                _scrollPosition,
+                false,
+                true,
+                GUILayout.MinWidth(0),
+                GUILayout.ExpandWidth(true));
 
             foreach (var tag in filtered)
             {
                 var wasSelected = _selectedTags.Contains(tag);
-                var isSelected = EditorGUILayout.ToggleLeft(tag, wasSelected);
+                var isSelected = EditorGUILayout.ToggleLeft(
+                    tag,
+                    wasSelected,
+                    GUILayout.MinWidth(0),
+                    GUILayout.ExpandWidth(true));
                 if (isSelected != wasSelected)
                 {
                     if (isSelected)

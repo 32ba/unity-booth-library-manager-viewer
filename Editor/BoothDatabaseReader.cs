@@ -46,23 +46,26 @@ namespace BoothLibraryViewer
                             ri.id AS registered_item_id,
                             ri.created_at AS registered_created_at,
                             ri.updated_at AS registered_updated_at,
+                            ri.user_item_info_id,
                             bi.id AS booth_item_id,
-                            bi.name AS item_name,
+                            COALESCE(bi.name, ui.name) AS item_name,
                             bi.shop_subdomain,
-                            s.name AS shop_name,
+                            COALESCE(s.name, ui.shop_name) AS shop_name,
                             bi.thumbnail_url,
+                            ui.thumbnail_filename,
                             bi.published_at,
-                            bi.updated_at,
+                            COALESCE(bi.updated_at, ui.updated_at) AS updated_at,
                             sc.id AS sub_category_id,
                             sc.name AS sub_category_name,
                             sc.parent_category_id AS parent_category_id,
                             pc.name AS parent_category_name
                         FROM registered_items ri
                         LEFT JOIN booth_items bi ON ri.booth_item_id = bi.id
+                        LEFT JOIN user_item_info ui ON ri.user_item_info_id = ui.id
                         LEFT JOIN shops s ON bi.shop_subdomain = s.subdomain
-                        LEFT JOIN sub_categories sc ON bi.sub_category = sc.id
+                        LEFT JOIN sub_categories sc ON COALESCE(bi.sub_category, ui.sub_category) = sc.id
                         LEFT JOIN parent_categories pc ON sc.parent_category_id = pc.id
-                        ORDER BY bi.name";
+                        ORDER BY item_name";
 
                     var rows = db.Query<ItemRow>(query);
 
@@ -84,13 +87,17 @@ namespace BoothLibraryViewer
 
                     foreach (var row in rows)
                     {
+                        var boothItemId = row.booth_item_id;
                         var item = new BoothItem
                         {
-                            Id = row.booth_item_id,
+                            Id = boothItemId ?? 0,
+                            BoothItemId = boothItemId,
+                            IsUserItem = row.user_item_info_id.HasValue,
                             Name = row.item_name ?? "(Unknown)",
                             ShopSubdomain = row.shop_subdomain ?? "",
                             ShopName = row.shop_name ?? "",
                             ThumbnailUrl = row.thumbnail_url,
+                            ThumbnailPath = ResolveThumbnailPath(DbPath, row.thumbnail_filename),
                             SubCategoryId = row.sub_category_id,
                             SubCategoryName = row.sub_category_name ?? "",
                             ParentCategoryId = row.parent_category_id,
@@ -110,7 +117,7 @@ namespace BoothLibraryViewer
                         }
 
                         // Set tags
-                        if (tagLookup.TryGetValue(item.Id, out var tags))
+                        if (boothItemId.HasValue && tagLookup.TryGetValue(boothItemId.Value, out var tags))
                         {
                             item.Tags = tags;
                             foreach (var tag in tags)
@@ -241,17 +248,31 @@ namespace BoothLibraryViewer
             return null;
         }
 
+        private static string ResolveThumbnailPath(string dbPath, string thumbnailFilename)
+        {
+            if (string.IsNullOrEmpty(thumbnailFilename))
+                return null;
+
+            var dbDirectory = Path.GetDirectoryName(dbPath);
+            if (string.IsNullOrEmpty(dbDirectory))
+                return null;
+
+            return Path.Combine(dbDirectory, "thumbnails", thumbnailFilename);
+        }
+
         // Row types for sqlite-net query mapping
         private class ItemRow
         {
             public string registered_item_id { get; set; }
             public string registered_created_at { get; set; }
             public string registered_updated_at { get; set; }
-            public int booth_item_id { get; set; }
+            public int? user_item_info_id { get; set; }
+            public int? booth_item_id { get; set; }
             public string item_name { get; set; }
             public string shop_subdomain { get; set; }
             public string shop_name { get; set; }
             public string thumbnail_url { get; set; }
+            public string thumbnail_filename { get; set; }
             public string published_at { get; set; }
             public string updated_at { get; set; }
             public int? sub_category_id { get; set; }
