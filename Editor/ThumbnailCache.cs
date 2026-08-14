@@ -85,6 +85,51 @@ namespace BoothLibraryViewer
             return GetPlaceholder();
         }
 
+        public static Texture2D GetLocal(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return GetPlaceholder();
+
+            string cacheKey;
+            try
+            {
+                cacheKey = "file://" + Path.GetFullPath(path);
+            }
+            catch (Exception)
+            {
+                return GetPlaceholder();
+            }
+
+            if (MemoryCache.TryGetValue(cacheKey, out var cached) && cached != null)
+                return cached;
+
+            if (FailedUrls.Contains(cacheKey) || !File.Exists(path))
+            {
+                FailedUrls.Add(cacheKey);
+                return GetPlaceholder();
+            }
+
+            try
+            {
+                var bytes = File.ReadAllBytes(path);
+                var texture = new Texture2D(2, 2);
+                if (texture.LoadImage(bytes))
+                {
+                    MemoryCache[cacheKey] = texture;
+                    return texture;
+                }
+
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[BOOTH Library Viewer] Failed to load local thumbnail {path}: {e.Message}");
+            }
+
+            FailedUrls.Add(cacheKey);
+            return GetPlaceholder();
+        }
+
         public static void Clear()
         {
             foreach (var kvp in MemoryCache)

@@ -22,10 +22,13 @@ namespace BoothLibraryViewer
     public class BoothItem
     {
         public int Id { get; set; }
+        public int? BoothItemId { get; set; }
+        public bool IsUserItem { get; set; }
         public string Name { get; set; }
         public string ShopSubdomain { get; set; }
         public string ShopName { get; set; }
         public string ThumbnailUrl { get; set; }
+        public string ThumbnailPath { get; set; }
         public string SubCategoryName { get; set; }
         public string ParentCategoryName { get; set; }
         public string RegisteredCreatedAt { get; set; }
@@ -42,5 +45,7 @@ namespace BoothLibraryViewer
         public bool UnityPackagesLoaded { get; set; }
         public bool IsExpanded { get; set; }
         public FolderTreeNode FolderTree { get; set; }
+
+        public bool HasBoothPage => BoothItemId.HasValue;
     }
 }
